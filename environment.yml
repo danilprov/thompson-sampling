@@ -1,0 +1,14 @@
+name: thompson_alg
+channels:
+  - defaults
+dependencies:
+  - python=3.11.11
+  - pip=24.2
+  - pip:
+      - matplotlib==3.10.0
+      - notebook==7.2.2
+      - numpy==2.2.1
+      - pandas==2.2.3
+      - scikit-learn==1.6.1
+      - scipy==1.15.1
+      - tqdm==4.67.1
