@@ -42,6 +42,9 @@ class Simulator:
 
         return Yobs, true_scores
 
+    def get_action_features(self, chosen_actions):
+        return self.A[chosen_actions]
+
     def _generate_reward_linear(self, X):
         """
         Simple linear reward function.

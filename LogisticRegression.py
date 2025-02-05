@@ -1,6 +1,9 @@
 import numpy as np
 import scipy as sp
 import unittest
+
+from sklearn.linear_model import LogisticRegression
+
 from utils import sigmoid
 
 
@@ -10,12 +13,11 @@ class RegularizedLogisticRegression:
     Algorithm 3 from the paper: "An Empirical Evaluation of Thompson Sampling".
     https://papers.nips.cc/paper_files/paper/2011/hash/e53a0a2978c28872a4505bdb51db06dc-Abstract.html
     """
-    def __init__(self, d, regularization_strength=1., greedy=False):
+    def __init__(self, d, regularization_strength=1.):
         self.d = d # problem dimension (context + action)
         self.lambda_ = regularization_strength
-        self.greedy = greedy
         self.ms = np.zeros(d) # mean of the weights
-        self.qs = np.ones(d) * self.lambda_ # variance of the weights
+        self.qs = np.ones(d) * self.lambda_ # inverse variance of the weights
 
     def regularized_loglikelihood(self, theta, X, Y):
         """
@@ -62,7 +64,25 @@ class RegularizedLogisticRegression:
         self.qs += q_diag / (0.5 * len(X))
         self.ms = mean_m
 
-        return mean_m
+    def sample(self, greedy):
+        if greedy:
+            theta_hat = self.ms
+        else:
+            std = np.sqrt(1 / self.qs)
+            theta_hat = np.random.randn(self.d) * std + self.ms
+
+        return theta_hat
+
+
+class ThompsonSampling:
+    def __init__(self, d, regularization_strength=1., greedy=False):
+        self.d = d
+        self.greedy = greedy
+        self.policy = RegularizedLogisticRegression(d, regularization_strength)
+
+    def update_policy(self, X, A, Y):
+        Z = np.concatenate([X, A], axis=1)
+        self.policy.fit(Z, Y)
 
     def generate_action_scores(self, X, Aall):
         """
@@ -74,23 +94,10 @@ class RegularizedLogisticRegression:
         """
         # Z = [X, A] for all possible actions
         Z = np.hstack([np.repeat(X, len(Aall), axis=0), np.tile(Aall, (len(X), 1))])
-        if self.greedy:
-            scores_pred = np.dot(Z, self.ms).reshape(len(X), len(Aall))
-        else:
-            theta_hat = np.random.randn(self.d) * np.sqrt(1 / self.qs) + self.ms
-            scores_pred = np.dot(Z, theta_hat).reshape(len(X), len(Aall))
+        theta_hat = self.policy.sample(self.greedy)
+        scores_pred = np.dot(Z, theta_hat).reshape(len(X), len(Aall))
 
         return scores_pred
-
-    def reset(self):
-        self.__init__(self.d, self.lambda_, self.greedy)
-
-    def get_params(self):
-        return self.ms, self.qs
-
-    def update_policy(self, X, A, Y):
-        Z = np.concatenate([X, A], axis=1)
-        self.fit(Z, Y)
 
 
 class TestRegularizedLogisticRegression(unittest.TestCase):
@@ -118,10 +125,12 @@ class TestRegularizedLogisticRegression(unittest.TestCase):
         Y = np.random.binomial(1, sigmoid(np.dot(X, theta)))
 
         clf = RegularizedLogisticRegression(d)
-        theta_hat = clf.fit(X, Y)
+        clf.fit(X, Y)
 
-        self.assertTrue(np.allclose(theta_hat, theta, rtol=1e-01))
+        self.assertTrue(np.allclose(clf.ms, theta, rtol=1e-01))
 
+
+class TestThompsonSampling(unittest.TestCase):
     def test_generate_action_scores(self):
         X = np.array([[1.0, 2.0, 3.0],
                       [2.0, 3.0, 4.0],
@@ -129,8 +138,8 @@ class TestRegularizedLogisticRegression(unittest.TestCase):
         Aall = np.array([[0.1, 0.2, 0.3],
                          [0.4, 0.5, 0.6]])
 
-        clf = RegularizedLogisticRegression(X.shape[1] + Aall.shape[1], greedy=True)
-        clf.ms = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+        clf = ThompsonSampling(X.shape[1] + Aall.shape[1], greedy=True)
+        clf.policy.ms = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
         actual_scores = clf.generate_action_scores(X, Aall)
 
         expected_scores = np.array([[1.72, 2.17],

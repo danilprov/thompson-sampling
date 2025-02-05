@@ -31,7 +31,7 @@ def softmax(x):
     exps = np.exp(x - x.max())
     return exps / np.sum(exps, keepdims=True)
 
-def run_experiment(env, policy, n_iter=10000, batch_size=32, verbose=False):
+def run_experiment(env, agent, n_iter=10000, batch_size=32, verbose=False):
     """
     Run an experiment on a contextual bandit environment.
     """
@@ -45,7 +45,7 @@ def run_experiment(env, policy, n_iter=10000, batch_size=32, verbose=False):
         Xb = env.generate_batch(batch_size)
 
         # select actions and observe rewards
-        pred_scores = policy.generate_action_scores(Xb, env.A)
+        pred_scores = agent.generate_action_scores(Xb, env.A)
         Ab = np.array([argmax(pred_scores[i]) for i in range(len(pred_scores))])
         Y, true_scores = env.generate_reward(Ab)
 
@@ -63,13 +63,13 @@ def run_experiment(env, policy, n_iter=10000, batch_size=32, verbose=False):
         # track stats
         if i < 50 or i % 500 == 0:
             mse_scores = mean_squared_error(true_scores, pred_scores)
-            mse_params = mean_squared_error(env.theta, policy.ms)
+            mse_params = mean_squared_error(env.theta, agent.policy.ms)
             if verbose:
                 print(
-                    f'{i:7d}/{n_iter:7d} - mse params {mse_params:.4f}, mse scores: {mse_scores:.4f}, variance: {(1 / policy.qs).mean():.4f}')
+                    f'{i:7d}/{n_iter:7d} - mse params {mse_params:.4f}, mse scores: {mse_scores:.4f}, variance: {(1 / agent.policy.qs).mean():.4f}')
 
         # update
-        Afeat = env.A[Ab]
-        policy.update_policy(Xb, Afeat, Y)
+        Afeat = env.get_action_features(Ab)
+        agent.update_policy(Xb, Afeat, Y)
 
     return chosen_actions, optimal_actions, logreg_regret, random_regret
