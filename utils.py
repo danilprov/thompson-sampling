@@ -1,6 +1,57 @@
 from sklearn.metrics import mean_squared_error
 import numpy as np
+import torch
 
+
+def softmax_torch(x):
+    """
+    A numerically stable version of the softmax function for 2D tensors.
+    """
+    exps = torch.exp(x - torch.max(x, dim=1, keepdim=True).values)
+    return exps / torch.sum(exps, dim=1, keepdim=True)
+
+
+def run_experiment_torch(env, policy, n_iter=10000, batch_size=32, verbose=False):
+    """
+    Run an experiment on a contextual bandit environment.
+    """
+    logreg_regret = []
+    chosen_actions = [0] * env.k
+    optimal_actions = [0] * env.k
+    random_regret = []
+    Aall = env.get_all_actions()
+
+    for i in range(n_iter):
+        # sample batch
+        Xb = env.generate_batch(batch_size)
+
+        # select actions and observe rewards
+        Ab, pred_scores = policy.sample_actions(Xb, Aall)
+        Y, true_scores = env.generate_reward(Ab)
+
+        # log performance
+        optimal_score, Aopt = torch.max(true_scores, dim=1)
+        chosen_score = true_scores[range(len(Ab)), Ab]
+        Arand = torch.randint(0, env.k, (len(Ab),))
+        random_score = true_scores[range(len(Ab)), Arand]
+        logreg_regret.append((optimal_score - chosen_score).mean().item())
+        random_regret.append((optimal_score - random_score).mean().item())
+        for j in range(batch_size):
+            chosen_actions[Ab[j]] += 1
+            optimal_actions[Aopt[j]] += 1
+
+        # track stats
+        if i < 50 or i % 500 == 0:
+            mse_scores = mean_squared_error(true_scores, pred_scores)
+            if verbose:
+                print(
+                    f'{i:7d}/{n_iter:7d} - mse params ------, mse scores: {mse_scores:.4f}, variance: ------')
+
+        # update
+        Afeat = env.get_action_features(Ab)
+        policy.update_policy(Xb, Afeat, Y)
+
+    return chosen_actions, optimal_actions, logreg_regret, random_regret
 
 def sigmoid(z):
     # sigmoid function
