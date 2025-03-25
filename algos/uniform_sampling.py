@@ -4,6 +4,7 @@ from algos.bandit_algorithm import BanditAlgorithm
 
 
 class UniformSampling(BanditAlgorithm):
+    """Algorithm that samples actions uniformly at random."""
 
     def __init__(self, name, hparams):
         super(UniformSampling, self).__init__()
