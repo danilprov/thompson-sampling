@@ -1,5 +1,6 @@
 import numpy as np
 from utils import sigmoid
+import torch
 
 class Simulator:
     """
@@ -94,3 +95,37 @@ class Simulator:
     def reset(self):
         self.__init__(k=self.k, linear=self.linear_reward, d_x=self.d_x,
                       d_a=self.d_a, seed=self.seed)
+
+    def get_all_actions(self):
+        return self.A
+
+
+class SimulatorTorchWrapper(Simulator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _to_numpy(self, tensor):
+        return tensor.cpu().numpy() if isinstance(tensor, torch.Tensor) else tensor
+
+    def _to_tensor(self, array, dtype=torch.float32):
+        return torch.tensor(array, dtype=dtype) if isinstance(array, np.ndarray) else array
+
+    def generate_batch(self, n):
+        X = super().generate_batch(n)
+        return self._to_tensor(X)
+
+    def generate_reward(self, A):
+        # Convert torch tensor to numpy for parent call
+        A_np = self._to_numpy(A)
+        Yobs, true_scores = super().generate_reward(A_np)
+        # Convert back to tensors
+        return self._to_tensor(Yobs), self._to_tensor(true_scores)
+
+    def get_all_actions(self):
+        return self._to_tensor(super().get_all_actions())
+
+    def get_action_features(self, chosen_actions):
+        return self._to_tensor(super().get_action_features(self._to_numpy(chosen_actions)))
+
+    def reset(self):
+        super().reset()

@@ -129,7 +129,8 @@ class TestIncrementalGreedyAgent(unittest.TestCase):
         Aall = torch.tensor([[0.1, 0.2],
                          [0.4, 0.5]])
         policy = IncrementalGreedyAgent(d)
-        Asampled = policy.sample_actions(X, Aall)
+        Asampled = policy.sample_actions(X, Aall)[0]
+
         self.assertTrue(torch.equal(torch.tensor([1, 0, 0]), Asampled))
 
     def test_fit(self):
@@ -159,34 +160,4 @@ class TestIncrementalGreedyAgent(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # unittest.main()
-
-    from envs.linear_bandit import SimulatorTorchWrapper
-
-    k = 20
-    batch_size = 4
-    env = SimulatorTorchWrapper(k=k, linear=True)
-    d = env.d_x + env.d_a
-    policy = IncrementalGreedyAgent(d)
-
-    chosen_actions = [0] * env.k
-    optimal_actions = [0] * env.k
-    for i in range(1):
-        Xb = env.generate_batch(batch_size)
-
-        # select actions and observe rewards
-        pred_scores = policy.generate_action_scores(Xb, env.A)
-        Ab = torch.argmax(pred_scores, dim=1)
-        Y, true_scores = env.generate_reward(Ab)
-
-        # log performance
-        optimal_scores, Aopt = torch.max(true_scores, dim=1)
-        Arand = torch.randint(0, env.k, (len(Ab),))
-        chosen_score = true_scores[range(len(Ab)), Ab]
-        random_score = true_scores[range(len(Ab)), Arand]
-        for j in range(batch_size):
-            chosen_actions[Ab[j]] += 1
-            optimal_actions[Aopt[j]] += 1
-
-        Afeat = env.A[Ab]
-        policy.update_policy(Xb, Afeat, Y)
+    unittest.main()
