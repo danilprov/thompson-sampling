@@ -23,7 +23,7 @@ def run_contextual_bandit(context_dim, actions, dataset, algos, batch_size, verb
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # Create contextual bandit
-    cmab = ContextualBandit(context_dim, actions)
+    cmab = ContextualBandit(context_dim, actions, batch_size)
     cmab.feed_data(dataset)
 
     h_actions = torch.empty((num_contexts, len(algos)), dtype=torch.long, device='cpu')
@@ -32,8 +32,9 @@ def run_contextual_bandit(context_dim, actions, dataset, algos, batch_size, verb
     row_idx = 0
 
     # Run the contextual bandit process
-    for i in range(max_iters):
-        context = cmab.context(batch_size).to(device)
+    for i, context_batch in enumerate(cmab):
+        #context = cmab.context(batch_size).to(device)
+        context = context_batch.to(device)
         actions = []
         rewards = []
 
@@ -62,22 +63,22 @@ def run_contextual_bandit(context_dim, actions, dataset, algos, batch_size, verb
         #optimal_reward, _ = cmab.optimal()
         actions_tensor = torch.stack(actions, dim=1)
         rewards_tensor = torch.stack(rewards, dim=1)
-        actual_batch_size = min(batch_size, context.shape[0])
-        h_actions[row_idx:row_idx + actual_batch_size] = actions_tensor
-        h_rewards[row_idx:row_idx + actual_batch_size] = rewards_tensor
-        #h_regrets[row_idx:row_idx + actual_batch_size] = optimal_reward.reshape(actual_batch_size, 1) - rewards_tensor
-        h_regrets[row_idx:row_idx + actual_batch_size] = cmab.regret(actions_tensor)
-        row_idx += actual_batch_size
+        h_actions[row_idx:row_idx + context.shape[0]] = actions_tensor
+        h_rewards[row_idx:row_idx + context.shape[0]] = rewards_tensor
+        #h_regrets[row_idx:row_idx + context.shape[0]] = optimal_reward.reshape(actual_batch_size, 1) - rewards_tensor
+        h_regrets[row_idx:row_idx + context.shape[0]] = cmab.regret(actions_tensor)
+        row_idx += context.shape[0]
 
     return h_actions, h_rewards, h_regrets
 
 class ContextualBandit(object):
     """Implements a Contextual Bandit with d-dimensional contexts and k arms."""
 
-    def __init__(self, context_dim, actions):
+    def __init__(self, context_dim, actions, batch_size):
         self._context_dim = context_dim
         self._actions = actions
         self._num_actions = len(actions)
+        self.batch_size = batch_size
         self.current_index = 0
         self.indices = None
         self.data = None
@@ -103,7 +104,11 @@ class ContextualBandit(object):
         self.current_index = 0
         self.indices = None
 
-    def context(self, batch_size):
+    def __iter__(self):
+        self.reset() # if I reset the order for each for loop changes.
+        return self
+
+    def __next__(self):
         """
         Retrieves one batch of contexts
         We also update self.indices and generate rewards for the batch here.
@@ -111,7 +116,7 @@ class ContextualBandit(object):
         if self.current_index >= self.number_contexts:
             raise StopIteration("No more data available. Please reset the bandit.")
 
-        end_index = min(self.current_index + batch_size, self.number_contexts)
+        end_index = min(self.current_index + self.batch_size, self.number_contexts)
         self.indices = self.order[self.current_index:end_index]
         self.current_index = end_index
 
