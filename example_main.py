@@ -89,7 +89,7 @@ def display_results(algos, opt_rewards, opt_actions, h_rewards, h_actions, t_ini
 def main():
     batch_size = 32
     data_type = 'linear'
-    num_contexts = 100
+    num_contexts = 10000
 
     sampled_vals = sample_data(data_type, num_contexts)
     dataset, available_actions, context_dim, action_dim, opt_rewards, opt_actions = sampled_vals
@@ -106,7 +106,7 @@ def main():
         'action_dim': action_dim,
         'num_actions': len(available_actions),
         'greedy': False,
-        'regularization_strength': 10.,
+        'regularization_strength': 0.1,
         'warmup_batches': 0#min(5, num_contexts // batch_size)
     }
     hparams_ts_linear = ParamConfig(**hparams_ts_linear)
@@ -121,6 +121,6 @@ def main():
 
 if __name__ == '__main__':
     import numpy as np
-    torch.manual_seed(1)
+    torch.manual_seed(123)
     np.random.seed(1)
     main()

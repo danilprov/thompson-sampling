@@ -5,7 +5,12 @@ import torch.nn.functional as F
 
 
 class NeuralBanditModel(nn.Module):
-    """Implements a neural network for bandit problems in PyTorch."""
+    """
+    A policy underlying the bandit algorithm implemented as a neural network.
+
+    Note: this implementation treats actions as classes and the network outputs the K logits for each action.
+    Therefore, this policy ignores the action context (if it exists).
+    """
 
     def __init__(self, hparams):
         super(NeuralBanditModel, self).__init__()
@@ -15,7 +20,7 @@ class NeuralBanditModel(nn.Module):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {self.device}")
 
-        # Build layers
+        # hidden layers
         layers = []
         input_dim = self.hparams.context_dim
         for num_units in self.hparams.layer_sizes:
@@ -25,11 +30,11 @@ class NeuralBanditModel(nn.Module):
                 layers.append(nn.Dropout(p=1 - self.hparams.keep_prob))
             input_dim = num_units
 
-        # Output layer
+        # output layer
         self.net = nn.Sequential(*layers).to(self.device)
         self.output_layer = nn.Linear(input_dim, self.hparams.num_actions).to(self.device)
 
-        # Optimizer and learning rate scheduler
+        # optimizer and learning rate scheduler
         self.optimizer = optim.RMSprop(self.parameters(), lr=self.hparams.initial_lr)
         self.lr_scheduler = optim.lr_scheduler.StepLR(
             self.optimizer, step_size=1, gamma=self.hparams.lr_decay_rate
@@ -96,19 +101,19 @@ class HParams:
 
 
 # Example usage
-hparams = HParams()
-model = NeuralBanditModel(hparams)
-
-# Create dummy data loader
-batch_size = 32
-x = torch.rand(batch_size, hparams.context_dim)
-y = torch.rand(batch_size, hparams.num_actions)
-w = torch.ones(batch_size, hparams.num_actions)  # Example weights
-data_loader = [(x, y, w)] * 500  # Dummy repeated dataset
-
-# Train model
-model.train_model(data_loader, num_steps=500)
-
-# Predict
-preds = model.predict(x)
-print(preds)
+# hparams = HParams()
+# model = NeuralBanditModel(hparams)
+#
+# # Create dummy data loader
+# batch_size = 32
+# x = torch.rand(batch_size, hparams.context_dim)
+# y = torch.rand(batch_size, hparams.num_actions)
+# w = torch.ones(batch_size, hparams.num_actions)  # Example weights
+# data_loader = [(x, y, w)] * 500  # Dummy repeated dataset
+#
+# # Train model
+# model.train_model(data_loader, num_steps=500)
+#
+# # Predict
+# preds = model.predict(x)
+# print(preds)
